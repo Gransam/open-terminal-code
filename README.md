@@ -15,10 +15,27 @@ Outils ajoutes et partages entre toutes les instances :
 | Linux | `ripgrep` (`rg`), `fd-find` (alias `fd`), `shellcheck` |
 | Python | `pytest`, `httpx`, `playwright`, `ruff` |
 | Node.js | `typescript`, `tsx`, `playwright`, `eslint`, `prettier` |
+| PowerShell | `pwsh` (PowerShell 7), `Pester`, `PSScriptAnalyzer` |
 
-| PowerShell | `pwsh` (PowerShell 7), `Pester`, `PSScriptAnalyzer` |\n\nChromium est **deja fourni par l'image officielle** : aucun second navigateur n'est telecharge lors du build. Pour Playwright, lancer Chromium avec `executablePath: '/usr/bin/chromium'` (Node.js) ou `executable_path='/usr/bin/chromium'` (Python). Dans cet environnement conteneurise, `--no-sandbox` peut etre necessaire.
+Chromium est **deja fourni par l'image officielle** : aucun second navigateur n'est telecharge lors du build. Pour Playwright, lancer Chromium avec `executablePath: '/usr/bin/chromium'` (Node.js) ou `executable_path='/usr/bin/chromium'` (Python). Dans cet environnement conteneurise, `--no-sandbox` peut etre necessaire.
 
-Pour tester PowerShell : `pwsh -NoProfile -Command '$PSVersionTable.PSVersion'`, `Invoke-Pester ./tests`, `Invoke-ScriptAnalyzer ./script.ps1`. PowerShell s'execute sous **Linux** : les modules propres a Windows, le Registre et les cmdlets Windows ne sont pas disponibles ici.\n\n## Mises a jour automatiques
+Pour tester PowerShell : `pwsh -NoProfile -Command '$PSVersionTable.PSVersion'`, `Invoke-Pester ./tests`, `Invoke-ScriptAnalyzer ./script.ps1`. PowerShell s'execute sous **Linux** : les modules propres a Windows, le Registre et les cmdlets Windows ne sont pas disponibles ici.
+
+## Chromium et instructions automatiques pour Qwen
+
+L'image configure `OPEN_TERMINAL_INFO` et `OPEN_TERMINAL_EXECUTE_DESCRIPTION` : Open Terminal communique automatiquement au modele les outils deja presents et la facon de les utiliser. Il n'est pas necessaire de recopier ces instructions dans chaque conversation.
+
+La commande `capture-web` pilote le Chromium Debian deja installe, sans telecharger un autre navigateur :
+
+```bash
+capture-web https://www.google.fr screenshots/google.png --width 1280 --height 800
+```
+
+Pour creer un screenshot avec le code Python/Node.js d'un projet, indiquer explicitement le chemin du binaire `/usr/bin/chromium`.
+
+Une capture sauvegardee sur disque est distincte d'une image transmise en entree visuelle au modele. Qwen doit recevoir les pixels dans la reponse d'un outil compatible vision pour faire une vraie analyse visuelle.
+
+## Mises a jour automatiques
 
 Le workflow [Build Open Terminal Code](.github/workflows/build.yml) :
 
