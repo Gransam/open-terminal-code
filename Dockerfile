@@ -49,6 +49,17 @@ RUN set -eux; \
 RUN pwsh -NoLogo -NoProfile -NonInteractive -Command \
     '$ErrorActionPreference = "Stop"; Install-Module -Name Pester,PSScriptAnalyzer -Scope AllUsers -Force -SkipPublisherCheck -ErrorAction Stop; Import-Module Pester -ErrorAction Stop; Import-Module PSScriptAnalyzer -ErrorAction Stop; "PowerShell test modules ready"'
 
+# Capture standardisee avec Chromium systeme (aucun navigateur supplementaire).
+COPY scripts/capture-web /usr/local/bin/capture-web
+RUN chmod +x /usr/local/bin/capture-web \
+    && python -m py_compile /usr/local/bin/capture-web \
+    && test -x /usr/bin/chromium
+
+# Informations rendues visibles a Qwen via l'API /system d'Open Terminal.
+# Ne pas redefinir OPEN_TERMINAL_SYSTEM_PROMPT : garder la description dynamique.
+ENV OPEN_TERMINAL_INFO="This is the Code development container. Chromium is already installed at /usr/bin/chromium; use that existing executable with Playwright (Python: chromium.launch(executable_path='/usr/bin/chromium', headless=True); Node: chromium.launch({executablePath:'/usr/bin/chromium',headless:true})). NEVER run playwright install, npx playwright install, or download another browser unless the user explicitly requests it. For screenshots, prefer: capture-web https://www.google.fr screenshots/google.png --width 1280 --height 800 ; then use Open Terminal file display tools to show the saved image. Installed tools include Python/pytest/httpx/ruff, Node.js/TypeScript/Playwright, Chromium, PowerShell 7 (pwsh), Pester and PSScriptAnalyzer, git, jq, ffmpeg, pandoc, LibreOffice. Check with command -v before suggesting an installation. Screenshots saved on disk are NOT automatically given to the vision model; only claim visual inspection if image content was actually returned to model."
+ENV OPEN_TERMINAL_EXECUTE_DESCRIPTION="Use the installed system Chromium /usr/bin/chromium rather than downloading Playwright browsers. For a webpage screenshot use capture-web URL output.png. PowerShell 7 is available as pwsh."
+
 # Reprendre l'utilisateur non-root et le repertoire de travail de l'image officielle.
 USER user
 WORKDIR /home/user
