@@ -15,10 +15,22 @@ RUN apt-get update \
 # Tests et automatisation Python. On reutilise Chromium deja present dans l'image.
 RUN python -m pip install --no-cache-dir pytest httpx playwright ruff
 
-# CLI web / TypeScript. Pas de nouveau telechargement de navigateur.
+# CLI web / TypeScript. Aucun telechargement de navigateur pendant npm install.
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
-RUN npm install --global --prefix /usr/local typescript tsx playwright eslint prettier \
-    && npm cache clean --force
+# Eviter un prefixe npm force et exposer le vrai diagnostic en cas d'echec.
+RUN set -eux; \
+    node --version; \
+    npm --version; \
+    npm install -g --no-audit --no-fund --fetch-retries=3 \
+      typescript tsx playwright eslint prettier \
+    || { \
+      echo "==== npm install failed: debug logs ===="; \
+      find /root/.npm/_logs -type f -name '*debug-0.log' -exec tail -n 90 {} \; || true; \
+      exit 1; \
+    }; \
+    npm cache clean --force; \
+    tsc --version; \
+    playwright --version
 
 # PowerShell 7 depuis le depot officiel Microsoft pour la version Debian de l'image.
 # Cela evite de figer une version et suit les mises a jour lors du build hebdomadaire.
