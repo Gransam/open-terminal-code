@@ -1,0 +1,141 @@
+#!/usr/bin/env python3
+"""Quick responsive and runtime audit using the system Chromium already installed.
+
+Examples:
+  check-web http://127.0.0.1:8080
+  check-web http://127.0.0.1:8080 --output-dir screenshots/dashboard
+  check-web http://127.0.0.1:8080 --hover "tbody tr:first-child" --click-mobile ".menu-toggle"
+
+Produces desktop/tablet/mobile PNGs and a machine-readable report.json.
+It is a helper, not a substitute for custom Playwright tests or visual review.
+"""
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+from playwright.sync_api import sync_playwright
+
+
+VIEWPORTS = {
+    "desktop": {"width": 1280, "height": 900},
+    "tablet": {"width": 768, "height": 1024},
+    "mobile": {"width": 375, "height": 812},
+}
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Test a web page across viewports with system Chromium.")
+    parser.add_argument("url", help="Page URL, beginning with http:// or https://")
+    parser.add_argument("--output-dir", default="screenshots/check-web", help="Where PNGs and report.json are saved")
+    parser.add_argument("--viewports", nargs="+", choices=VIEWPORTS, default=list(VIEWPORTS),
+                        help="Viewports to test (default: desktop tablet mobile)")
+    parser.add_argument("--wait-ms", type=int, default=700, help="Pause after DOM content loads (milliseconds)")
+    parser.add_argument("--timeout-ms", type=int, default=30000, help="Navigation timeout (milliseconds)")
+    parser.add_argument("--full-page", action="store_true", help="Capture entire page instead of just viewport")
+    parser.add_argument("--hover", help="CSS selector to hover on desktop; saves desktop-hover.png")
+    parser.add_argument("--click-mobile", help="CSS selector to click on mobile; saves mobile-click.png")
+    args = parser.parse_args()
+
+    if not args.url.startswith(("http://", "https://")):
+        parser.error("URL must begin with http:// or https://")
+    if args.wait_ms < 0 or args.timeout_ms < 1:
+        parser.error("--wait-ms must be >= 0 and --timeout-ms must be > 0")
+
+    output_dir = Path(args.output_dir).expanduser().resolve()
+    output_dir.mkdir(parents=True, exist_ok=True)
+    report = {"url": args.url, "checks": {}, "ok": True}
+
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(
+                executable_path="/usr/bin/chromium",
+                headless=True,
+                args=["--no-sandbox"],
+            )
+            try:
+                for name in args.viewports:
+                    context = browser.new_context(viewport=VIEWPORTS[name], device_scale_factor=1)
+                    page = context.new_page()
+                    page_errors = []
+                    console_errors = []
+                    page.on("pageerror", lambda error: page_errors.append(str(error)))
+                    page.on("console", lambda msg: console_errors.append(msg.text) if msg.type == "error" else None)
+                    entry = {"viewport": VIEWPORTS[name]}
+                    try:
+                        response = page.goto(args.url, wait_until="domcontentloaded", timeout=args.timeout_ms)
+                        page.wait_for_timeout(args.wait_ms)
+                        metrics = page.evaluate("""() => {
+                            const root = document.documentElement;
+                            const body = document.body;
+                            return {
+                                title: document.title,
+                                client_width: root.clientWidth,
+                                scroll_width: Math.max(root.scrollWidth, body ? body.scrollWidth : 0),
+                                meta_viewport: !!document.querySelector('meta[name="viewport"]')
+                            };
+                        }""")
+                        entry.update(metrics)
+                        entry["http_status"] = response.status if response else None
+                        entry["overflow_px"] = max(0, metrics["scroll_width"] - metrics["client_width"])
+                        png = output_dir / f"{name}.png"
+                        page.screenshot(path=str(png), full_page=args.full_page)
+                        entry["screenshot"] = str(png)
+
+                        selector = args.hover if name == "desktop" else args.click_mobile if name == "mobile" else None
+                        if selector:
+                            try:
+                                target = page.locator(selector).first
+                                if name == "desktop":
+                                    target.hover(timeout=5000)
+                                    action_file = output_dir / "desktop-hover.png"
+                                else:
+                                    target.click(timeout=5000)
+                                    action_file = output_dir / "mobile-click.png"
+                                page.screenshot(path=str(action_file), full_page=args.full_page)
+                                entry["interaction_screenshot"] = str(action_file)
+                            except Exception as exc:
+                                entry["interaction_error"] = str(exc)
+                    except Exception as exc:
+                        entry["error"] = str(exc)
+                    finally:
+                        entry["page_errors"] = page_errors
+                        entry["console_errors"] = console_errors
+                        context.close()
+
+                    failed = (
+                        "error" in entry
+                        or "interaction_error" in entry
+                        or entry.get("http_status") is None
+                        or entry.get("http_status", 200) >= 400
+                        or entry.get("overflow_px", 0) > 1
+                        or bool(page_errors)
+                    )
+                    entry["ok"] = not failed
+                    report["ok"] = report["ok"] and entry["ok"]
+                    report["checks"][name] = entry
+            finally:
+                browser.close()
+    except Exception as exc:
+        report["error"] = str(exc)
+        report["ok"] = False
+
+    report_path = output_dir / "report.json"
+    report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    for name, entry in report["checks"].items():
+        status = "PASS" if entry["ok"] else "FAIL"
+        print(f"[{status}] {name}: HTTP {entry.get('http_status', '?')} | "
+              f"overflow {entry.get('overflow_px', '?')}px | "
+              f"JS errors {len(entry['page_errors'])} | "
+              f"{entry.get('screenshot', entry.get('error', 'no screenshot'))}")
+        if entry.get("interaction_error"):
+            print(f"  Interaction error: {entry['interaction_error']}", file=sys.stderr)
+    if report.get("error"):
+        print(f"Browser error: {report['error']}", file=sys.stderr)
+    print(f"Report: {report_path}")
+    return 0 if report["ok"] else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
