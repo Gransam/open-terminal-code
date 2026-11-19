@@ -12,13 +12,13 @@ Outils ajoutes et partages entre toutes les instances :
 
 | Famille | Paquets |
 | --- | --- |
-| Linux | `ripgrep` (`rg`), `fd-find` (alias `fd`) |
-| Python | `pytest`, `httpx`, `playwright` |
-| Node.js | `typescript`, `tsx`, `playwright` |
+| Linux | `ripgrep` (`rg`), `fd-find` (alias `fd`), `shellcheck` |
+| Python | `pytest`, `httpx`, `playwright`, `ruff` |
+| Node.js | `typescript`, `tsx`, `playwright`, `eslint`, `prettier` |
 
-Chromium est **deja fourni par l'image officielle** : aucun second navigateur n'est telecharge lors du build. Pour Playwright, lancer Chromium avec `executablePath: '/usr/bin/chromium'` (Node.js) ou `executable_path='/usr/bin/chromium'` (Python). Dans cet environnement conteneurise, `--no-sandbox` peut etre necessaire.
+| PowerShell | `pwsh` (PowerShell 7), `Pester`, `PSScriptAnalyzer` |\n\nChromium est **deja fourni par l'image officielle** : aucun second navigateur n'est telecharge lors du build. Pour Playwright, lancer Chromium avec `executablePath: '/usr/bin/chromium'` (Node.js) ou `executable_path='/usr/bin/chromium'` (Python). Dans cet environnement conteneurise, `--no-sandbox` peut etre necessaire.
 
-## Mises a jour automatiques
+Pour tester PowerShell : `pwsh -NoProfile -Command '$PSVersionTable.PSVersion'`, `Invoke-Pester ./tests`, `Invoke-ScriptAnalyzer ./script.ps1`. PowerShell s'execute sous **Linux** : les modules propres a Windows, le Registre et les cmdlets Windows ne sont pas disponibles ici.\n\n## Mises a jour automatiques
 
 Le workflow [Build Open Terminal Code](.github/workflows/build.yml) :
 
