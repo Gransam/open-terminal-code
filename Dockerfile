@@ -13,11 +13,14 @@ RUN apt-get update \
     && ln -sf /usr/bin/fdfind /usr/local/bin/fd \
     && rm -rf /var/lib/apt/lists/*
 
-# Tests et automatisation Python. On reutilise Chromium deja present dans l'image.
+# Tests et automatisation Python.
 RUN python -m pip install --no-cache-dir pytest httpx playwright ruff yamllint pytest-cov pytest-asyncio
 
-# CLI web / TypeScript. Aucun telechargement de navigateur pendant npm install.
-ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+# Navigateurs Playwright preinstalles dans une couche commune de l'image.
+# Les telechargements implicites pendant npm install restent desactives.
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
+    PLAYWRIGHT_BROWSERS_PATH=/opt/playwright-browsers \
+    PLAYWRIGHT_SKIP_BROWSER_GC=1
 # Eviter un prefixe npm force et exposer le vrai diagnostic en cas d'echec.
 RUN set -eux; \
     node --version; \
@@ -32,6 +35,17 @@ RUN set -eux; \
     npm cache clean --force; \
     tsc --version; \
     playwright --version
+
+# Installer les revisions officielles Chromium attendues par Playwright Python et Node.
+# Inclut le navigateur complet et le headless shell pour launch() sans executablePath.
+# Le cache appartient a l'image et reste lisible par l'utilisateur non-root.
+RUN set -eux; \
+    mkdir -p "$PLAYWRIGHT_BROWSERS_PATH"; \
+    python -m playwright --version; \
+    playwright --version; \
+    env -u PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD python -m playwright install chromium; \
+    env -u PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD playwright install chromium; \
+    chmod -R a+rX "$PLAYWRIGHT_BROWSERS_PATH"
 
 
 # Mike Farah yq (Go CLI, not Debian/Python yq).
@@ -60,18 +74,18 @@ RUN set -eux; \
 RUN pwsh -NoLogo -NoProfile -NonInteractive -Command \
     '$ErrorActionPreference = "Stop"; Install-Module -Name Pester,PSScriptAnalyzer -Scope AllUsers -Force -SkipPublisherCheck -ErrorAction Stop; Import-Module Pester -ErrorAction Stop; Import-Module PSScriptAnalyzer -ErrorAction Stop; "PowerShell test modules ready"'
 
-# Capture standardisee avec Chromium systeme (aucun navigateur supplementaire).
+# Capture standardisee avec Chromium systeme, puis test Playwright avec ses navigateurs preinstalles.
 COPY scripts/capture-web /usr/local/bin/capture-web
 COPY scripts/check-web /usr/local/bin/check-web
 COPY scripts/smoke-browser /usr/local/bin/smoke-browser
 RUN chmod +x /usr/local/bin/capture-web /usr/local/bin/check-web /usr/local/bin/smoke-browser \
     && python -m py_compile /usr/local/bin/capture-web /usr/local/bin/check-web /usr/local/bin/smoke-browser \
     && test -x /usr/bin/chromium \
-    && /usr/local/bin/smoke-browser
+    && runuser -u user -- /usr/local/bin/smoke-browser
 
 # Contexte minimal pour tous les modeles IA ; les logiciels restent decouvrables a la demande.
 # Garder le prompt systeme dynamique officiel (ne pas definir OPEN_TERMINAL_SYSTEM_PROMPT).
-ENV OPEN_TERMINAL_INFO="You have a capable, persistent Linux development environment. Discover available tools and libraries as needed; verify before claiming anything is missing. Choose freely between integrated Browser tools (when available), Playwright, shell commands, and other methods based on the task. Playwright supports deeper scripted browser automation; neither option is mandatory. Reuse system Chromium at /usr/bin/chromium with Playwright when compatible; download another browser only when needed. Verify results, adapt to failures, and preserve existing work. For image analysis, read actual pixels with read_file; display_file only opens the user viewer."
+ENV OPEN_TERMINAL_INFO="You have a capable, persistent Linux development environment. Discover available tools and libraries as needed; verify before claiming anything is missing. Choose freely between integrated Browser tools (when available), Playwright, shell commands, and other methods based on the task. Playwright supports deeper scripted browser automation; neither option is mandatory. Verify results, adapt to failures, and preserve existing work. For image analysis, read actual pixels with read_file; display_file only opens the user viewer."
 ENV OPEN_TERMINAL_EXECUTE_DESCRIPTION="Explore the environment and inspect command results. For Open Terminal Browser > Ports live previews, run development servers as managed foreground processes and track them with get_process_status."
 
 # Reprendre l'utilisateur non-root et le repertoire de travail de l'image officielle.

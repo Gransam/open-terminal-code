@@ -19,7 +19,7 @@ Outils ajoutes et partages entre toutes les instances :
 | Documents et images | `tesseract` (OCR anglais/francais), `exiftool` |
 | PowerShell | `pwsh` (PowerShell 7), `Pester`, `PSScriptAnalyzer` |
 
-Chromium est **deja fourni par l'image officielle** : aucun second navigateur n'est telecharge lors du build. Pour Playwright, lancer Chromium avec `executablePath: '/usr/bin/chromium'` (Node.js) ou `executable_path='/usr/bin/chromium'` (Python). Dans cet environnement conteneurise, `--no-sandbox` peut etre necessaire.
+Deux usages coexistent : le Chromium systeme `/usr/bin/chromium` reste disponible (notamment pour Browser), et les navigateurs Chromium officiels attendus par **Playwright Python et Node.js** sont telecharges **une fois pendant la construction de l'image** dans `/opt/playwright-browsers` (`PLAYWRIGHT_BROWSERS_PATH`). Cela inclut Chromium et son headless shell. Les conteneurs reutilisent les couches de l'image Docker : `chromium.launch(headless=True)` fonctionne normalement **sans `executable_path` ni installation supplementaire**. Si un projet installe une autre version de Playwright exigeant une revision differente, celle-ci peut toutefois necessiter une installation adaptee.
 
 Pour tester PowerShell : `pwsh -NoProfile -Command '$PSVersionTable.PSVersion'`, `Invoke-Pester ./tests`, `Invoke-ScriptAnalyzer ./script.ps1`. PowerShell s'execute sous **Linux** : les modules propres a Windows, le Registre et les cmdlets Windows ne sont pas disponibles ici.
 
@@ -33,7 +33,7 @@ La commande `capture-web` pilote le Chromium Debian deja installe, sans telechar
 capture-web https://www.google.fr screenshots/google.png --width 1280 --height 800
 ```
 
-Pour creer un screenshot avec le code Python/Node.js d'un projet, indiquer explicitement le chemin du binaire `/usr/bin/chromium`. Browser et Playwright restent tous deux disponibles, sans hierarchie imposee.
+Pour creer un screenshot avec Playwright Python ou Node.js, laisser Playwright choisir son navigateur preinstalle : aucune option `executable_path` ou `executablePath` n'est requise. Browser et Playwright restent tous deux disponibles, sans hierarchie imposee.
 
 Une capture sauvegardee sur disque est distincte d'une image transmise en entree visuelle au modele. Le modele doit recevoir les pixels dans la reponse d'un outil compatible vision pour faire une vraie analyse visuelle.
 
@@ -54,7 +54,7 @@ Il genere `desktop.png`, `tablet.png`, `mobile.png` et `report.json`. Il teste n
 
 **Vision :** pour analyser les captures en pixels, employer `read_file`. `display_file` sert uniquement a les montrer a l'utilisateur.
 
-**Philosophie :** aucun ordre de preference entre les outils Browser integres et Playwright. Browser permet d'interagir avec les onglets Open WebUI ; Playwright permet des automatisations et tests plus approfondis. Le modele explore les capacites installees, choisit librement et ne telecharge un autre navigateur que si necessaire. Le build execute `smoke-browser`, qui lance Chromium systeme avec Playwright Python et Node.js sans acces reseau.
+**Philosophie :** aucun ordre de preference entre les outils Browser integres et Playwright. Browser permet d'interagir avec les onglets Open WebUI ; Playwright permet des automatisations et tests plus approfondis. Le modele explore les capacites installees et choisit librement. Le build execute `smoke-browser` **en tant que l'utilisateur non-root**, qui lance le Chromium Playwright preinstalle via Python et Node.js **sans chemin explicite et sans acces reseau**.
 
 ## Mises a jour automatiques
 
