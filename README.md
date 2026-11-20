@@ -23,9 +23,9 @@ Chromium est **deja fourni par l'image officielle** : aucun second navigateur n'
 
 Pour tester PowerShell : `pwsh -NoProfile -Command '$PSVersionTable.PSVersion'`, `Invoke-Pester ./tests`, `Invoke-ScriptAnalyzer ./script.ps1`. PowerShell s'execute sous **Linux** : les modules propres a Windows, le Registre et les cmdlets Windows ne sont pas disponibles ici.
 
-## Chromium et instructions automatiques pour Qwen
+## Chromium et instructions automatiques pour les modeles IA
 
-L'image configure `OPEN_TERMINAL_INFO` et `OPEN_TERMINAL_EXECUTE_DESCRIPTION` : Open Terminal communique automatiquement au modele les outils deja presents et la facon de les utiliser. Il n'est pas necessaire de recopier ces instructions dans chaque conversation.
+L'image configure deux descriptions **courtes** (`OPEN_TERMINAL_INFO` et `OPEN_TERMINAL_EXECUTE_DESCRIPTION`) : elles encouragent la decouverte des commandes et bibliotheques a la demande plutot que de figer un inventaire d'outils dans le prompt. Le modele choisit librement sa methode.
 
 La commande `capture-web` pilote le Chromium Debian deja installe, sans telecharger un autre navigateur :
 
@@ -33,9 +33,9 @@ La commande `capture-web` pilote le Chromium Debian deja installe, sans telechar
 capture-web https://www.google.fr screenshots/google.png --width 1280 --height 800
 ```
 
-Pour creer un screenshot avec le code Python/Node.js d'un projet, indiquer explicitement le chemin du binaire `/usr/bin/chromium`.
+Pour creer un screenshot avec le code Python/Node.js d'un projet, indiquer explicitement le chemin du binaire `/usr/bin/chromium`. Browser et Playwright restent tous deux disponibles, sans hierarchie imposee.
 
-Une capture sauvegardee sur disque est distincte d'une image transmise en entree visuelle au modele. Qwen doit recevoir les pixels dans la reponse d'un outil compatible vision pour faire une vraie analyse visuelle.
+Une capture sauvegardee sur disque est distincte d'une image transmise en entree visuelle au modele. Le modele doit recevoir les pixels dans la reponse d'un outil compatible vision pour faire une vraie analyse visuelle.
 
 
 ### Live Preview et tests web automatiques
@@ -54,7 +54,7 @@ Il genere `desktop.png`, `tablet.png`, `mobile.png` et `report.json`. Il teste n
 
 **Vision :** pour analyser les captures en pixels, employer `read_file`. `display_file` sert uniquement a les montrer a l'utilisateur.
 
-**Philosophie :** `OPEN_TERMINAL_INFO` et `OPEN_TERMINAL_EXECUTE_DESCRIPTION` enumerent les outils disponibles et les bonnes pratiques (notamment Live Preview). Ce sont des indications souples : l'agent garde toute latitude pour installer des frameworks supplementaires, improviser, explorer et proposer des architectures originales. Les outils sont optionnels selon le besoin.
+**Philosophie :** aucun ordre de preference entre les outils Browser integres et Playwright. Browser permet d'interagir avec les onglets Open WebUI ; Playwright permet des automatisations et tests plus approfondis. Le modele explore les capacites installees, choisit librement et ne telecharge un autre navigateur que si necessaire. Le build execute `smoke-browser`, qui lance Chromium systeme avec Playwright Python et Node.js sans acces reseau.
 
 ## Mises a jour automatiques
 
